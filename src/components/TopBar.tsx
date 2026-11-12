@@ -24,7 +24,7 @@ export function TopBar(props: { subtitle: string; modeSelector: ReactNode; badge
 
 export function TopStat({ label, value, accent, wide }: { label: string; value: string | number; accent?: boolean; wide?: boolean }) {
   return (
-    <div className={`top-stat ${accent ? 'accent' : ''} ${wide ? 'wide' : ''}`}>
+    <div className={`top-stat ${accent ? 'accent' : ''} ${wide ? 'wide' : ''}`} title={`${label}: ${value}`}>
       <div className="ts-label">{label}</div>
       <div className="ts-value">{value}</div>
     </div>

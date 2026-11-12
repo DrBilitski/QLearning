@@ -107,9 +107,11 @@ button {
   gap: 0.5rem;
   flex: 1;
   justify-content: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap; /* never wrap: a wrapping top bar pushes the whole page down */
+  min-width: 0;
 }
 .top-stat {
+  flex-shrink: 0;
   background: rgba(255, 255, 255, 0.13);
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 12px;
@@ -118,7 +120,10 @@ button {
   min-width: 5.2rem;
 }
 .top-stat.wide {
-  min-width: 13rem;
+  /* fixed width so changing stage names never resize the bar */
+  width: 16.5rem;
+  flex-shrink: 1;
+  min-width: 10rem;
 }
 .top-stat.accent {
   background: var(--y400);
@@ -130,15 +135,19 @@ button {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   opacity: 0.85;
+  line-height: 1.2; /* explicit, so the bar height doesn't change when the web font loads */
 }
 .ts-value {
   font-size: 1.3rem;
+  line-height: 1.3;
   font-weight: 900;
   font-variant-numeric: tabular-nums;
 }
 .top-stat.wide .ts-value {
   font-size: 1.05rem;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .mode-badge {
   font-weight: 900;
@@ -205,7 +214,34 @@ button {
 .area-qtable { grid-area: qtable; }
 .area-eps { grid-area: eps; }
 .area-bellman { grid-area: bellman; }
-.area-explain { grid-area: explain; }
+.area-explain {
+  grid-area: explain;
+  /* Fixed-size box: the explanation text changes length every microstep, and
+     must not resize the row (that would shift the control buttons). */
+  min-height: 23rem;
+}
+.dqn-game .area-explain,
+.dqn-train .area-explain {
+  min-height: 27rem; /* 15-stage stepper + end-of-episode card */
+}
+/* fade only (no slide) inside the fixed box, so no scrollbar flashes */
+.area-explain .explain-text,
+.area-explain .episode-card {
+  animation-name: fade-only;
+}
+@keyframes fade-only {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.area-explain .panel-body {
+  position: relative;
+}
+.area-explain .explain {
+  position: absolute;
+  inset: 0.5rem 0.8rem;
+  height: auto;
+  overflow-y: auto;
+}
 
 .instructor {
   display: grid;
