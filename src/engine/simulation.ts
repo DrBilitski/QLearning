@@ -8,6 +8,7 @@ import {
 } from './agent';
 import { DEFAULT_REWARDS, RewardConfig, Transition, WORLD } from './environment';
 import { fmtNum, fmtProb, fmtQ, fmtReward } from './format';
+import { Decision, Draw, epsilonDecision, needsActionDraw, selectAction } from './policy';
 import { quantise, rngNext } from './rng';
 import { ACTION_NAMES, Action, Pos, fmtPos, posKey } from './types';
 
@@ -75,21 +76,7 @@ export const DEFAULT_PARAMS: Params = {
 
 export const DEFAULT_SEED = 1783;
 
-export interface Decision {
-  epsilon: number;
-  random: number;
-  randomScripted: boolean;
-  explore: boolean;
-  qValues: number[];
-  best: Action[];
-  /** Filled in at the "select" microstep. */
-  action?: Action;
-  /** Second random number: which action to explore, or which tied action to exploit. */
-  actionRandom?: number;
-  actionRandomScripted?: boolean;
-  /** How the action was picked, e.g. "random 0.612 × 4 = 2.45 → LEFT". */
-  pickDetail?: string;
-}
+export type { Decision } from './policy';
 
 export interface NextStateInfo {
   terminal: boolean;
@@ -215,11 +202,6 @@ function startExplanation(episode: number, start: Pos, last: EpisodeRecord | nul
   return `${intro} The robot is placed at ${fmtPos(start)}. Press Next Step to watch it make its first decision.`;
 }
 
-interface Draw {
-  value: number;
-  scripted: boolean;
-}
-
 /** Take the next random number: a scripted one if a guided scenario provides it, otherwise the seeded RNG. */
 function draw(s: SimState): [Draw, Pick<SimState, 'rngState' | 'script'>] {
   if (s.script.length > 0) {
@@ -300,74 +282,17 @@ export function advance(s: SimState): SimState {
 
     case 'inspect': {
       const [d, rng] = draw(s);
-      const eps = s.params.epsilon;
-      const explore = d.value < eps;
-      const qValues = [...s.q[posKey(s.current)]];
-      const decision: Decision = {
-        epsilon: eps,
-        random: d.value,
-        randomScripted: d.scripted,
-        explore,
-        qValues,
-        best: bestActions(qValues),
-      };
-      const cmp = explore ? '<' : '≥';
-      return {
-        ...base,
-        ...rng,
-        phase: 'decide',
-        decision,
-        explanation:
-          `EPSILON DECISION: The random number is ${fmtProb(d.value, eps)}${d.scripted ? ' (predetermined for this scenario)' : ''}, and ε = ${fmtProb(eps, d.value)}. ` +
-          `${fmtProb(d.value, eps)} ${cmp} ${fmtProb(eps, d.value)}, so the robot will ${explore ? 'EXPLORE: it picks an action at random' : 'EXPLOIT: it picks the action with the highest Q-value'}.`,
-      };
+      const { decision, explanation } = epsilonDecision(s.q[posKey(s.current)], s.params.epsilon, d);
+      return { ...base, ...rng, phase: 'decide', decision, explanation };
     }
 
     case 'decide': {
       const dec = s.decision!;
-      let action: Action;
-      let pickDetail: string;
+      let d: Draw | null = null;
       let rng: Partial<SimState> = {};
-      let actionRandom: number | undefined;
-      let actionRandomScripted: boolean | undefined;
-      let explanation: string;
-
-      if (dec.explore) {
-        const [d, r] = draw(s);
-        rng = r;
-        actionRandom = d.value;
-        actionRandomScripted = d.scripted;
-        const idx = Math.min(3, Math.floor(d.value * 4)) as Action;
-        action = idx;
-        pickDetail = `random ${fmtProb(d.value)} × 4 = ${fmtNum(d.value * 4)} → slot ${idx} → ${ACTION_NAMES[idx]}`;
-        const isBest = dec.best.includes(action) && dec.best.length < 4;
-        explanation =
-          `SELECT ACTION: The robot is exploring, so every one of the four actions had an equal 25% chance. A second random number picked ${ACTION_NAMES[action]}. ` +
-          (isBest
-            ? 'This happens to also be the highest-valued action. Exploration can still land on the best action by chance.'
-            : 'Its Q-value did not matter. Exploring is how the robot tries things it does not yet know about.');
-      } else if (dec.best.length > 1) {
-        const [d, r] = draw(s);
-        rng = r;
-        actionRandom = d.value;
-        actionRandomScripted = d.scripted;
-        const idx = Math.min(dec.best.length - 1, Math.floor(d.value * dec.best.length));
-        action = dec.best[idx];
-        pickDetail = `tie between ${names(dec.best)}; random ${fmtProb(d.value)} × ${dec.best.length} = ${fmtNum(d.value * dec.best.length)} → ${ACTION_NAMES[action]}`;
-        explanation = `SELECT ACTION: The robot is exploiting, but ${names(dec.best)} are tied for the highest Q-value (${fmtQ(maxValue(dec.qValues))}). The tie is broken randomly, which gives ${ACTION_NAMES[action]}.`;
-      } else {
-        action = dec.best[0];
-        pickDetail = `highest Q-value: ${ACTION_NAMES[action]} = ${fmtQ(dec.qValues[action])}`;
-        explanation = `SELECT ACTION: The robot is exploiting, so it chooses ${ACTION_NAMES[action]}. That action has the highest Q-value in this state (${fmtQ(dec.qValues[action])}).`;
-      }
-
-      return {
-        ...base,
-        ...rng,
-        phase: 'select',
-        decision: { ...dec, action, actionRandom, actionRandomScripted, pickDetail },
-        explanation,
-      };
+      if (needsActionDraw(dec)) [d, rng] = draw(s);
+      const { decision, explanation } = selectAction(dec, d);
+      return { ...base, ...rng, phase: 'select', decision, explanation };
     }
 
     case 'select': {

@@ -2,9 +2,8 @@ import { useId } from 'react';
 import { bestActions } from '../engine/agent';
 import { WORLD } from '../engine/environment';
 import { fmtQ, fmtReward } from '../engine/format';
-import { SimState, reached } from '../engine/simulation';
 import { ACTION_DELTAS, Action, Pos, posKey, samePos } from '../engine/types';
-import { highlights } from '../view';
+import { BoardModel } from '../view';
 import { valueColor } from './ui';
 
 const C = 150; // tile size in SVG units
@@ -18,21 +17,21 @@ const cx = (p: Pos) => tx(p) + C / 2;
 const cy = (p: Pos) => ty(p) + C / 2;
 
 interface Props {
-  state: SimState;
+  model: BoardModel;
   inspected: Pos | null;
   onTileClick: (p: Pos) => void;
   showValues: boolean;
   showPolicy: boolean;
 }
 
-export function Board({ state, inspected, onTileClick, showValues, showPolicy }: Props) {
+export function Board({ model, inspected, onTileClick, showValues, showPolicy }: Props) {
   const uid = useId().replace(/:/g, '');
-  const hl = highlights(state);
-  const tr = state.transition;
-  const afterExec = tr && reached(state.phase, 'execute');
+  const hl = model.hl;
+  const tr = model.transition;
+  const afterExec = tr && model.afterExecute;
   const mood = afterExec ? (tr!.outcome === 'goal' ? 'happy' : tr!.outcome === 'trap' ? 'sad' : 'normal') : 'normal';
-  const look = state.decision?.action !== undefined && reached(state.phase, 'select') ? state.decision.action : null;
-  const bumping = state.phase === 'execute' && tr?.outcome === 'bump';
+  const look = model.look;
+  const bumping = model.bumping;
 
   return (
     <svg className="board" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Grid world">
@@ -72,7 +71,7 @@ export function Board({ state, inspected, onTileClick, showValues, showPolicy }:
           key={posKey(p)}
           p={p}
           uid={uid}
-          q={state.q[posKey(p)]}
+          q={model.values(p)}
           showValues={showValues}
           showPolicy={showPolicy}
           onClick={() => onTileClick(p)}
@@ -80,7 +79,7 @@ export function Board({ state, inspected, onTileClick, showValues, showPolicy }:
           inspectingCurrent={hl.inspectingCurrent && samePos(hl.current, p)}
           selected={samePos(hl.current, p) ? hl.selectedAction : null}
           updated={hl.updated && samePos(hl.updated.s, p) ? hl.updated.a : null}
-          updateKey={state.lastUpdate?.tick ?? 0}
+          updateKey={model.updateKey}
         />
       ))}
 
@@ -94,12 +93,12 @@ export function Board({ state, inspected, onTileClick, showValues, showPolicy }:
         <rect className="hl-next" x={tx(hl.next) + 12} y={ty(hl.next) + 12} width={C - 24} height={C - 24} rx={12} />
       )}
 
-      <Robot pos={state.pos} mood={mood} look={look} bump={bumping ? (tr!.action as Action) : null} bumpKey={state.tick} />
+      <Robot pos={model.pos} mood={mood} look={look} bump={bumping ? (tr!.action as Action) : null} bumpKey={model.tick} />
 
       {/* selected action arrow (drawn above the robot so it is never hidden) */}
-      {hl.current && hl.selectedAction !== null && <ActionArrow from={hl.current} a={hl.selectedAction} uid={uid} key={`arr${state.decision?.action}${state.step}`} />}
+      {hl.current && hl.selectedAction !== null && <ActionArrow from={hl.current} a={hl.selectedAction} uid={uid} key={model.arrowKey} />}
 
-      {state.phase === 'reward' && tr && <RewardPop key={state.tick} at={tr.to} reward={tr.reward} outcome={tr.outcome} />}
+      {model.showReward && tr && <RewardPop key={model.tick} at={tr.to} reward={tr.reward} outcome={tr.outcome} />}
     </svg>
   );
 }

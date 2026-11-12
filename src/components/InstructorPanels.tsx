@@ -5,7 +5,7 @@ import { SCENARIOS } from '../engine/scenarios';
 import { Params, SimState } from '../engine/simulation';
 import { SimController } from '../useSimulation';
 
-export function RewardsPanel({ state, ctl }: { state: SimState; ctl: SimController }) {
+export function RewardsPanel({ rewards, setRewards }: { rewards: RewardConfig; setRewards: (r: Partial<RewardConfig>) => void }) {
   const rows: { k: keyof RewardConfig; icon: string; label: string }[] = [
     { k: 'goal', icon: '🏆', label: 'Reach the goal' },
     { k: 'trap', icon: '💥', label: 'Enter the trap' },
@@ -15,7 +15,7 @@ export function RewardsPanel({ state, ctl }: { state: SimState; ctl: SimControll
   return (
     <div className="rewards">
       {rows.map((r) => {
-        const v = state.rewards[r.k];
+        const v = rewards[r.k];
         return (
           <label key={r.k} className={`reward-row ${v > 0 ? 'pos' : v < 0 ? 'neg' : ''}`}>
             <span className="rw-icon">{r.icon}</span>
@@ -26,7 +26,7 @@ export function RewardsPanel({ state, ctl }: { state: SimState; ctl: SimControll
               value={v}
               onChange={(e) => {
                 const n = parseFloat(e.target.value);
-                if (!Number.isNaN(n)) ctl.setRewards({ [r.k]: n });
+                if (!Number.isNaN(n)) setRewards({ [r.k]: n });
               }}
             />
           </label>

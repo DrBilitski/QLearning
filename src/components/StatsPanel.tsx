@@ -29,7 +29,7 @@ function Stat({ label, value, tone }: { label: string; value: string | number; t
   );
 }
 
-function RewardChart({ history }: { history: EpisodeRecord[] }) {
+export function RewardChart({ history }: { history: EpisodeRecord[] }) {
   const W = 520;
   const H = 190;
   const pad = { l: 44, r: 12, t: 14, b: 30 };

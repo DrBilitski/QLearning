@@ -1,14 +1,12 @@
 import { fmtProb, fmtQ } from '../engine/format';
-import { SimState, reached } from '../engine/simulation';
 import { ACTIONS, ACTION_ARROWS, ACTION_NAMES } from '../engine/types';
+import { EpsilonModel } from '../view';
 
-export function EpsilonPanel({ state }: { state: SimState }) {
-  const d = reached(state.phase, 'decide') && state.phase !== 'continue' ? state.decision : null;
-  const eps = d ? d.epsilon : state.params.epsilon;
+/** Epsilon-greedy visualisation, shared by tabular Q-learning and DQN. */
+export function EpsilonPanel({ model, valueSource = 'Q-value' }: { model: EpsilonModel; valueSource?: string }) {
+  const { decision: d, epsilon: eps, values, selected } = model;
   const explorePct = Math.round(eps * 1000) / 10;
   const exploitPct = Math.round((100 - explorePct) * 10) / 10;
-  const selected = d && reached(state.phase, 'select') ? d.action ?? null : null;
-  const values = d?.qValues ?? (reached(state.phase, 'inspect') && state.phase !== 'continue' ? state.q[`${state.current.x},${state.current.y}`] : null);
 
   return (
     <div className="eps">
@@ -28,7 +26,7 @@ export function EpsilonPanel({ state }: { state: SimState }) {
         </div>
         <div className="prob-exploit">{eps <= 0.86 && <span>EXPLOIT</span>}</div>
         {d && (
-          <div key={state.tick - phaseOffset(state)} className="prob-marker" style={{ left: `${d.random * 100}%` }}>
+          <div key={model.animKey} className="prob-marker" style={{ left: `${d.random * 100}%` }}>
             <div className="prob-marker-label">{fmtProb(d.random, d.epsilon)}</div>
           </div>
         )}
@@ -60,7 +58,7 @@ export function EpsilonPanel({ state }: { state: SimState }) {
         {ACTIONS.map((a) => {
           const isBest = d && !d.explore && d.best.includes(a);
           return (
-            <div key={a} className={['action-chip', selected === a ? 'chosen' : '', isBest ? 'best' : '', d?.explore && selected === null ? 'candidate' : ''].join(' ')}>
+            <div key={a} className={['action-chip', selected === a ? 'chosen' : '', isBest ? 'best' : '', d?.explore && selected === null ? 'candidate' : ''].join(' ')} title={valueSource}>
               <div className="ac-arrow">{ACTION_ARROWS[a]}</div>
               <div className="ac-name">{ACTION_NAMES[a]}</div>
               <div className="ac-q mono">{values ? fmtQ(values[a]) : '—'}</div>
@@ -83,11 +81,4 @@ export function EpsilonPanel({ state }: { state: SimState }) {
       </p>
     </div>
   );
-}
-
-/** Keep the marker's drop animation from replaying on later microsteps of the same action. */
-function phaseOffset(s: SimState): number {
-  const order = ['decide', 'select', 'execute', 'reward', 'inspectNext', 'bellman', 'update'];
-  const i = order.indexOf(s.phase);
-  return i < 0 ? 0 : i;
 }
