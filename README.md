@@ -10,8 +10,14 @@ Built with React + TypeScript + Vite. It runs entirely in the browser with no ba
 npm install
 npm run dev        # open the printed localhost URL
 npm test           # engine tests (Bellman math, decay, scenarios, determinism)
-npm run build      # static build in dist/ — serve it (npm run preview) or host on any static host
+npm run build      # produces ONE self-contained file: dist/index.html
 ```
+
+The build inlines all JavaScript and CSS into `dist/index.html`. That single file
+needs no backend: double-click it, share it, or upload it to any static web host
+(Netlify Drop, Azure Static Web Apps, GitHub Pages, university web space). The
+only external request is the Nunito font; offline it falls back to a system font.
+
 
 ## Instructor controls
 
